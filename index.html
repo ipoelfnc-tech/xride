@@ -1,0 +1,384 @@
+import React, { useState, useEffect, useRef } from 'react';
+import { 
+  Terminal, Database, Truck, Code, Cpu, 
+  Activity, Shield, Wifi, Zap, ChevronDown, 
+  ExternalLink, Mail, Github, Linkedin, MousePointer2 
+} from 'lucide-react';
+
+/**
+ * CONFIGURATION & ASSETS
+ */
+const CONFIG = {
+  frameCount: 95,
+  scrollHeight: 5000, 
+  baseFrameUrl: "https://vhpycybcqstbpehnnadk.supabase.co/storage/v1/object/sign/tridi-bucket/frame_000_delay-0.042s.webp?token=eyJraWQiOiJzdG9yYWdlLXVybC1zaWduaW5nLWtleV9kNWQ0MGJmZS00MzZmLTQwMTMtYTY0ZS1lNzc1NGYxZWZlZGIiLCJhbGciOiJIUzI1NiJ9.eyJ1cmwiOiJ0cmlkaS1idWNrZXQvZnJhbWVfMDAwX2RlbGF5LTAuMDQycy53ZWJwIiwiaWF0IjoxNzcxMTMyNjQ0LCJleHAiOjE3NzE3Mzc0NDR9.kfjqQr6uiJ754nbp1B5ToCVZHuapq-RXZJmVRSjphsA"
+};
+
+/**
+ * COMPONENTS
+ */
+
+// Custom Cursor Component
+const CustomCursor = () => {
+  const [pos, setPos] = useState({ x: 0, y: 0 });
+  const [hovering, setHovering] = useState(false);
+
+  useEffect(() => {
+    const move = (e) => setPos({ x: e.clientX, y: e.clientY });
+    const over = (e) => {
+      if (e.target.closest('button, a, .group')) setHovering(true);
+      else setHovering(false);
+    };
+    window.addEventListener('mousemove', move);
+    window.addEventListener('mouseover', over);
+    return () => {
+      window.removeEventListener('mousemove', move);
+      window.removeEventListener('mouseover', over);
+    };
+  }, []);
+
+  return (
+    <div 
+      className={`fixed pointer-events-none z-[9999] transition-transform duration-200 ease-out hidden md:block`}
+      style={{ transform: `translate(${pos.x}px, ${pos.y}px)` }}
+    >
+      <div className={`relative -translate-x-1/2 -translate-y-1/2 ${hovering ? 'scale-150' : 'scale-100'} transition-transform`}>
+        <div className="absolute w-8 h-8 border border-[#00f0ff] rounded-full opacity-20 animate-ping" />
+        <div className="w-6 h-6 border-2 border-[#00f0ff] relative">
+          <div className="absolute top-0 left-1/2 -translate-x-1/2 w-0.5 h-1 bg-[#ff003c]" />
+          <div className="absolute bottom-0 left-1/2 -translate-x-1/2 w-0.5 h-1 bg-[#ff003c]" />
+          <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-0.5 bg-[#ff003c]" />
+          <div className="absolute right-0 top-1/2 -translate-y-1/2 w-1 h-0.5 bg-[#ff003c]" />
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const GlitchText = ({ text, className = '' }) => (
+  <div className={`relative group ${className}`}>
+    <span className="relative z-10">{text}</span>
+    <span className="absolute top-0 left-0 -z-10 w-full text-[#ff003c] opacity-0 group-hover:opacity-70 group-hover:animate-pulse translate-x-[2px] blur-[1px]">
+      {text}
+    </span>
+    <span className="absolute top-0 left-0 -z-10 w-full text-[#00f0ff] opacity-0 group-hover:opacity-70 group-hover:animate-pulse -translate-x-[2px] blur-[1px]">
+      {text}
+    </span>
+  </div>
+);
+
+const CyberCard = ({ children, title, className = '', glow = 'cyan' }) => {
+  const accentColor = glow === 'pink' ? '#ff003c' : '#00f0ff';
+  return (
+    <div className={`relative bg-[#0a0a0a]/80 backdrop-blur-md border border-[${accentColor}]/30 p-8 clip-bottom-right transition-all hover:border-[${accentColor}] group ${className}`}>
+      {/* Corner Accents */}
+      <div className="absolute top-0 left-0 w-4 h-1 bg-[#00f0ff]" />
+      <div className="absolute top-0 left-0 w-1 h-4 bg-[#00f0ff]" />
+      <div className="absolute bottom-0 right-0 w-10 h-10 border-r-2 border-b-2 border-[#ff003c] translate-x-1 translate-y-1 opacity-50" />
+      
+      {title && (
+        <div className="absolute -top-3 left-4 bg-[#050505] px-2 text-[10px] tracking-[4px] font-bold text-[#00f0ff] uppercase">
+          {title}
+        </div>
+      )}
+      
+      {children}
+    </div>
+  );
+};
+
+export default function App() {
+  const [loading, setLoading] = useState(true);
+  const [progress, setProgress] = useState(0);
+  const [images, setImages] = useState([]);
+  const canvasRef = useRef(null);
+  const [frame, setFrame] = useState(0);
+
+  // Preload Images
+  useEffect(() => {
+    let loaded = 0;
+    const load = async () => {
+      const promises = Array.from({ length: CONFIG.frameCount }).map(() => {
+        return new Promise((resolve) => {
+          const img = new Image();
+          img.src = CONFIG.baseFrameUrl; // Demo menggunakan satu URL karena Signed Token
+          img.onload = () => {
+            loaded++;
+            setProgress((loaded / CONFIG.frameCount) * 100);
+            resolve(img);
+          };
+          img.onerror = resolve;
+        });
+      });
+      const res = await Promise.all(promises);
+      setImages(res);
+      setTimeout(() => setLoading(false), 1200);
+    };
+    load();
+  }, []);
+
+  // Canvas & Scroll Logic
+  useEffect(() => {
+    const handle = () => {
+      if (!canvasRef.current || images.length === 0) return;
+      const scrollY = window.scrollY;
+      const maxScroll = CONFIG.scrollHeight - window.innerHeight;
+      const fraction = Math.max(0, Math.min(1, scrollY / maxScroll));
+      const index = Math.min(CONFIG.frameCount - 1, Math.floor(fraction * CONFIG.frameCount));
+      
+      setFrame(index);
+
+      const ctx = canvasRef.current.getContext('2d');
+      const img = images[index];
+      if (img) {
+        const { width: cw, height: ch } = canvasRef.current;
+        const scale = Math.max(cw / img.width, ch / img.height);
+        const x = (cw - img.width * scale) / 2;
+        const y = (ch - img.height * scale) / 2;
+        ctx.clearRect(0, 0, cw, ch);
+        ctx.drawImage(img, x, y, img.width * scale, img.height * scale);
+        
+        // Cyber-overlay effect
+        ctx.fillStyle = 'rgba(0, 240, 255, 0.02)';
+        ctx.fillRect(0, 0, cw, ch);
+      }
+    };
+
+    const resize = () => {
+      if (canvasRef.current) {
+        canvasRef.current.width = window.innerWidth;
+        canvasRef.current.height = window.innerHeight;
+        handle();
+      }
+    };
+
+    window.addEventListener('scroll', handle);
+    window.addEventListener('resize', resize);
+    resize();
+    return () => {
+      window.removeEventListener('scroll', handle);
+      window.removeEventListener('resize', resize);
+    };
+  }, [images, loading]);
+
+  if (loading) {
+    return (
+      <div className="fixed inset-0 bg-[#050505] z-[999] flex flex-col items-center justify-center font-mono">
+        <div className="relative w-48 h-1 bg-[#111]">
+          <div className="h-full bg-[#00f0ff] shadow-[0_0_15px_#00f0ff]" style={{ width: `${progress}%` }} />
+          <div className="absolute -top-6 left-0 text-[10px] text-[#00f0ff] tracking-widest">BOOTING_SYSTEM...</div>
+          <div className="absolute -bottom-6 right-0 text-[10px] text-[#ff003c]">{Math.round(progress)}%</div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="bg-[#050505] text-gray-300 font-mono selection:bg-[#ff003c]">
+      <CustomCursor />
+      
+      {/* Visual FX Layers */}
+      <div className="fixed inset-0 pointer-events-none z-50 overflow-hidden">
+        <div className="absolute inset-0 opacity-[0.03] bg-[url('https://www.transparenttextures.com/patterns/stardust.png')]"></div>
+        <div className="absolute inset-0 scanlines"></div>
+      </div>
+
+      <style>{`
+        @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Orbitron:wght@400;900&display=swap');
+        .scanlines {
+          background: linear-gradient(to bottom, transparent 50%, rgba(0,0,0,0.5) 50%);
+          background-size: 100% 4px;
+        }
+        .clip-bottom-right {
+          clip-path: polygon(0 0, 100% 0, 100% calc(100% - 20px), calc(100% - 20px) 100%, 0 100%);
+        }
+        @keyframes glitch-anim {
+          0% { transform: translate(0); }
+          20% { transform: translate(-2px, 2px); }
+          40% { transform: translate(-2px, -2px); }
+          60% { transform: translate(2px, 2px); }
+          80% { transform: translate(2px, -2px); }
+          100% { transform: translate(0); }
+        }
+        .group:hover .glitch-active { animation: glitch-anim 0.2s infinite; }
+      `}</style>
+
+      {/* HERO SECTION */}
+      <div className="relative" style={{ height: `${CONFIG.scrollHeight}px` }}>
+        <div className="sticky top-0 h-screen w-full flex flex-col items-center justify-center overflow-hidden">
+          <canvas ref={canvasRef} className="absolute inset-0 w-full h-full object-cover" />
+          
+          <div className={`relative z-10 text-center transition-all duration-700 ${frame > 5 ? 'opacity-0 scale-95 translate-y-10' : 'opacity-100'}`}>
+            <div className="mb-4 inline-block px-3 py-1 border border-[#00f0ff] text-[#00f0ff] text-[10px] tracking-[0.5em] animate-pulse">
+              CONNECTION_ESTABLISHED
+            </div>
+            <h1 className="text-6xl md:text-9xl font-black text-white tracking-tighter mb-2 font-['Orbitron']">
+              SAEFUL<span className="text-[#ff003c]">BAHRI</span>
+            </h1>
+            <div className="flex items-center justify-center gap-4 text-[#00f0ff] tracking-[0.3em] text-sm md:text-xl">
+              <span className="opacity-50">&lt;</span>
+              <span>DATA_ENGINEER</span>
+              <span className="opacity-50">&gt;</span>
+            </div>
+            
+            <div className="absolute -bottom-40 left-1/2 -translate-x-1/2 flex flex-col items-center gap-2">
+              <span className="text-[10px] text-gray-500 uppercase tracking-widest">Scroll to Initialize</span>
+              <ChevronDown className="text-[#00f0ff] animate-bounce" size={20} />
+            </div>
+          </div>
+
+          {/* Side Info */}
+          <div className="absolute left-10 bottom-10 hidden lg:block text-[10px] text-gray-600 space-y-2">
+            <div className="flex items-center gap-2"><Wifi size={10} className="text-[#0aff0a]"/> NET_SECURED: AES-256</div>
+            <div className="flex items-center gap-2"><Cpu size={10}/> PROC: EX-CORE_V9</div>
+            <div className="flex items-center gap-2"><Activity size={10}/> SYNC_FRAME: {frame}/95</div>
+          </div>
+        </div>
+      </div>
+
+      {/* CONTENT AREA */}
+      <main className="relative z-20 bg-[#050505] px-6 pb-32">
+        <div className="max-w-6xl mx-auto space-y-48">
+          
+          {/* Section 1: Core System */}
+          <section className="grid grid-cols-1 lg:grid-cols-2 gap-20 items-center pt-20">
+            <div className="space-y-8">
+              <div className="inline-flex items-center gap-3 text-[#ff003c]">
+                <div className="h-[2px] w-12 bg-[#ff003c]" />
+                <span className="text-xs font-bold tracking-[0.4em]">USER_PROFILE</span>
+              </div>
+              <h2 className="text-4xl md:text-6xl font-black text-white font-['Orbitron'] leading-none">
+                BUILDING <br/> <span className="text-[#00f0ff]">NEURAL PIPELINES</span>
+              </h2>
+              <p className="text-lg text-gray-400 leading-relaxed max-w-xl">
+                Saya adalah arsitek data yang berfokus pada <span className="text-white">efisiensi aliran informasi</span>. 
+                Dengan latar belakang di sektor pengiriman, saya memahami bahwa data bukan sekadar angka, tapi adalah logistik digital yang harus sampai tepat waktu dan tanpa cacat.
+              </p>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="p-4 border border-[#222] bg-[#0a0a0a]">
+                  <div className="text-[10px] text-gray-500 mb-1 uppercase tracking-tighter">Academic_Degree</div>
+                  <div className="text-[#00f0ff] font-bold">Strata 1 (S1)</div>
+                </div>
+                <div className="p-4 border border-[#222] bg-[#0a0a0a]">
+                  <div className="text-[10px] text-gray-500 mb-1 uppercase tracking-tighter">Specialization</div>
+                  <div className="text-[#ff003c] font-bold">Data Architecture</div>
+                </div>
+              </div>
+            </div>
+
+            <div className="relative">
+              <div className="absolute -inset-4 border border-[#00f0ff]/20 animate-pulse" />
+              <CyberCard glow="cyan" title="SYSTEM_STATISTICS">
+                <div className="space-y-6 py-4">
+                  {[
+                    { label: 'ETL_EFFICIENCY', val: '98%' },
+                    { label: 'DATA_INTEGRITY', val: '100%' },
+                    { label: 'LATENCY_REDUCTION', val: '24ms' },
+                  ].map((s, i) => (
+                    <div key={i} className="group">
+                      <div className="flex justify-between text-xs mb-2">
+                        <span className="text-gray-500 tracking-widest">{s.label}</span>
+                        <span className="text-[#00f0ff]">{s.val}</span>
+                      </div>
+                      <div className="h-1 bg-[#111] overflow-hidden">
+                        <div className="h-full bg-[#00f0ff] group-hover:shadow-[0_0_10px_#00f0ff] transition-all duration-500" style={{ width: s.val.includes('%') ? s.val : '80%' }} />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </CyberCard>
+            </div>
+          </section>
+
+          {/* Section 2: Experience Logs */}
+          <section className="space-y-16">
+            <div className="text-center space-y-4">
+              <h2 className="text-4xl md:text-5xl font-black text-white font-['Orbitron'] tracking-widest uppercase italic">
+                Operational_Logs
+              </h2>
+              <div className="h-1 w-24 bg-[#ff003c] mx-auto" />
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+              <CyberCard glow="pink" title="LOG_01 // DELIVERY_SECTOR" className="lg:translate-y-10">
+                <div className="flex justify-between items-start mb-6">
+                  <div>
+                    <h3 className="text-2xl font-bold text-white">Logistics Operative</h3>
+                    <p className="text-[#ff003c] text-xs font-bold tracking-widest">2020 - PRESENT</p>
+                  </div>
+                  <Truck className="text-[#ff003c]" size={32} />
+                </div>
+                <p className="text-sm text-gray-400 leading-relaxed mb-6 italic">
+                  "Mengelola distribusi fisik dengan presisi tinggi. Mengoptimalkan rute pengiriman yang menjadi pondasi pemahaman saya tentang optimasi jalur data digital."
+                </p>
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2 text-[10px] text-[#00f0ff]">
+                    <Zap size={10}/> OPTIMASI RUTE FISIK
+                  </div>
+                  <div className="flex items-center gap-2 text-[10px] text-[#00f0ff]">
+                    <Shield size={10}/> KEAMANAN LOGISTIK
+                  </div>
+                </div>
+              </CyberCard>
+
+              <CyberCard glow="cyan" title="LOG_02 // DATA_STACK">
+                <div className="flex justify-between items-start mb-6">
+                  <div>
+                    <h3 className="text-2xl font-bold text-white">Neural Architect</h3>
+                    <p className="text-[#00f0ff] text-xs font-bold tracking-widest">TECHNICAL_SUITE</p>
+                  </div>
+                  <Database className="text-[#00f0ff]" size={32} />
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  {['Python', 'SQL', 'Airflow', 'Spark', 'Kafka', 'BigQuery'].map(skill => (
+                    <div key={skill} className="px-3 py-2 bg-[#111] border border-[#222] text-[10px] text-gray-300 flex items-center gap-2 group hover:border-[#00f0ff] transition-colors">
+                      <div className="w-1.5 h-1.5 bg-[#00f0ff] group-hover:animate-ping" />
+                      {skill.toUpperCase()}
+                    </div>
+                  ))}
+                </div>
+              </CyberCard>
+            </div>
+          </section>
+
+          {/* CONTACT / FOOTER */}
+          <section className="pb-40">
+            <div className="border-t border-[#222] pt-20 flex flex-col items-center">
+              <div className="mb-12 text-center max-w-2xl">
+                <h2 className="text-4xl md:text-7xl font-black text-white font-['Orbitron'] mb-6 tracking-tighter">
+                  READY_TO <br/> <span className="text-[#ff003c]">COLLABORATE?</span>
+                </h2>
+                <p className="text-gray-500">
+                  Sistem saya terbuka untuk koneksi baru. Jika Anda mencari insinyur data yang memahami logistik dan infrastruktur, silakan inisialisasi protokol komunikasi.
+                </p>
+              </div>
+
+              <div className="flex flex-wrap justify-center gap-8">
+                {[
+                  { label: 'GITHUB', icon: <Github />, color: '#fff' },
+                  { label: 'LINKEDIN', icon: <Linkedin />, color: '#00f0ff' },
+                  { label: 'EMAIL', icon: <Mail />, color: '#ff003c' }
+                ].map((link, i) => (
+                  <a 
+                    key={i}
+                    href="#"
+                    className="flex items-center gap-3 px-8 py-4 bg-[#0a0a0a] border border-[#222] hover:border-[#00f0ff] transition-all group clip-bottom-right"
+                  >
+                    <span style={{ color: link.color }} className="group-hover:scale-125 transition-transform">{link.icon}</span>
+                    <span className="font-bold tracking-widest text-sm group-hover:text-[#00f0ff]">{link.label}</span>
+                  </a>
+                ))}
+              </div>
+
+              <div className="mt-40 text-center opacity-20">
+                <div className="text-[10px] tracking-[1em] mb-2 uppercase">Saeful Bahri // Portfolio V1.0</div>
+                <div className="text-[8px]">&copy; 2024 NO_RIGHTS_RESERVED // OPEN_SOURCE_SOUL</div>
+              </div>
+            </div>
+          </section>
+
+        </div>
+      </main>
+    </div>
+  );
+}
